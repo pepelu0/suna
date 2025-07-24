@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Bot, Menu, Store } from 'lucide-react';
+import { Bot, Menu, Store, Plus, Zap, Plug, ChevronRight, Loader2 } from 'lucide-react';
 
 import { NavAgents } from '@/components/sidebar/nav-agents';
 import { NavUserWithTeams } from '@/components/sidebar/nav-user-with-teams';
@@ -14,12 +14,31 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarHeader,
+  SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -30,8 +49,10 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useFeatureFlags } from '@/lib/feature-flags';
+import { useCreateNewAgent } from '@/hooks/react-query/agents/use-agents';
+import { Button } from '../ui/button';
 
 export function SidebarLeft({
   ...props
@@ -49,11 +70,14 @@ export function SidebarLeft({
   });
 
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { flags, loading: flagsLoading } = useFeatureFlags(['custom_agents', 'agent_marketplace']);
   const customAgentsEnabled = flags.custom_agents;
   const marketplaceEnabled = flags.agent_marketplace;
+  const createNewAgentMutation = useCreateNewAgent();
+  const [showNewAgentDialog, setShowNewAgentDialog] = useState(false);
 
-  // Fetch user data
+  
   useEffect(() => {
     const fetchUserData = async () => {
       const supabase = createClient();
@@ -74,16 +98,11 @@ export function SidebarLeft({
     fetchUserData();
   }, []);
 
-  // Handle keyboard shortcuts (CMD+B) for consistency
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
         event.preventDefault();
-        // We'll handle this in the parent page component
-        // to ensure proper coordination between panels
         setOpen(!state.startsWith('expanded'));
-
-        // Broadcast a custom event to notify other components
         window.dispatchEvent(
           new CustomEvent('sidebar-left-toggled', {
             detail: { expanded: !state.startsWith('expanded') },
@@ -95,6 +114,11 @@ export function SidebarLeft({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [state, setOpen]);
+
+
+  const handleCreateNewAgent = () => {
+    createNewAgentMutation.mutate();
+  };
 
   return (
     <Sidebar
@@ -109,7 +133,6 @@ export function SidebarLeft({
           </Link>
           {state !== 'collapsed' && (
             <div className="ml-2 transition-all duration-200 ease-in-out whitespace-nowrap">
-              {/* <span className="font-semibold"> SUNA</span> */}
             </div>
           )}
           <div className="ml-auto flex items-center gap-2">
@@ -138,40 +161,80 @@ export function SidebarLeft({
         </div>
       </SidebarHeader>
       <SidebarContent className="[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-        {!flagsLoading && (customAgentsEnabled || marketplaceEnabled) && (
-          <SidebarGroup>
-            {customAgentsEnabled && (
-              <Link href="/agents">
-                <SidebarMenuButton className={cn({
-                  'bg-primary/10 font-medium': pathname === '/agents',
-                })}>
-                  <Bot className="h-4 w-4 mr-2" />
-                  <span className="flex items-center justify-between w-full">
-                    Agent Playground
-                    <Badge variant="new">
-                      New
-                    </Badge>
-                  </span>
-                </SidebarMenuButton>
-              </Link>
-            )}
-            {marketplaceEnabled && (
-              <Link href="/marketplace">
-                <SidebarMenuButton className={cn({
-                  'bg-primary/10 font-medium': pathname === '/marketplace',
-                })}>
-                  <Store className="h-4 w-4 mr-2" />
-                  <span className="flex items-center justify-between w-full">
-                    Marketplace
-                    <Badge variant="new">
-                      New
-                    </Badge>
-                  </span>
-                </SidebarMenuButton>
-              </Link>
-            )}
-          </SidebarGroup>
-        )}
+        <SidebarGroup>
+          <Link href="/dashboard">
+            <SidebarMenuButton className={cn({
+              'bg-accent text-accent-foreground font-medium': pathname === '/dashboard',
+            })}>
+              <Plus className="h-4 w-4 mr-1" />
+              <span className="flex items-center justify-between w-full">
+                New Task
+              </span>
+            </SidebarMenuButton>
+          </Link>
+          {!flagsLoading && customAgentsEnabled && (
+            <SidebarMenu>
+              <Collapsible
+                defaultOpen={pathname?.includes('/agents')}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      tooltip="Agents"
+                    >
+                      <Bot className="h-4 w-4 mr-1" />
+                      <span>Agents</span>
+                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton className={cn('pl-3', {
+                          'bg-accent text-accent-foreground font-medium': pathname === '/agents' && searchParams.get('tab') === 'marketplace',
+                        })} asChild>
+                          <Link href="/agents?tab=marketplace">
+                            <span>Explore</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton className={cn('pl-3', {
+                          'bg-accent text-accent-foreground font-medium': pathname === '/agents' && (searchParams.get('tab') === 'my-agents' || searchParams.get('tab') === null),
+                        })} asChild>
+                          <Link href="/agents?tab=my-agents">
+                            <span>My Agents</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton 
+                          onClick={() => setShowNewAgentDialog(true)}
+                          className="cursor-pointer pl-3"
+                        >
+                          <span>New Agent</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            </SidebarMenu>
+          )}
+          {!flagsLoading && customAgentsEnabled && (
+            <Link href="/settings/credentials">
+              <SidebarMenuButton className={cn({
+                'bg-accent text-accent-foreground font-medium': pathname === '/settings/credentials',
+              })}>
+                <Plug className="h-4 w-4 mr-1" />
+                <span className="flex items-center justify-between w-full">
+                  Integrations
+                </span>
+              </SidebarMenuButton>
+            </Link>
+          )}
+        </SidebarGroup>
         <NavAgents />
       </SidebarContent>
       {state !== 'collapsed' && (
@@ -193,6 +256,20 @@ export function SidebarLeft({
         <NavUserWithTeams user={user} />
       </SidebarFooter>
       <SidebarRail />
+      <AlertDialog open={showNewAgentDialog} onOpenChange={setShowNewAgentDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create New Agent</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a new agent with a default name and description.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCreateNewAgent}>Create</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   );
 }

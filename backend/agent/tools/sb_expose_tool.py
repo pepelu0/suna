@@ -1,6 +1,8 @@
 from agentpress.tool import ToolResult, openapi_schema, xml_schema
 from sandbox.tool_base import SandboxToolsBase
 from agentpress.thread_manager import ThreadManager
+import asyncio
+import time
 
 class SandboxExposeTool(SandboxToolsBase):
     """Tool for exposing and retrieving preview URLs for sandbox ports."""
@@ -67,8 +69,18 @@ class SandboxExposeTool(SandboxToolsBase):
             if not 1 <= port <= 65535:
                 return self.fail_response(f"Invalid port number: {port}. Must be between 1 and 65535.")
 
+            # Check if something is actually listening on the port (for custom ports)
+            if port not in [6080, 8080, 8003]:  # Skip check for known sandbox ports
+                try:
+                    port_check = await self.sandbox.process.exec(f"netstat -tlnp | grep :{port}", timeout=5)
+                    if port_check.exit_code != 0:
+                        return self.fail_response(f"No service is currently listening on port {port}. Please start a service on this port first.")
+                except Exception:
+                    # If we can't check, proceed anyway - the user might be starting a service
+                    pass
+
             # Get the preview link for the specified port
-            preview_link = self.sandbox.get_preview_link(port)
+            preview_link = await self.sandbox.get_preview_link(port)
             
             # Extract the actual URL from the preview link object
             url = preview_link.url if hasattr(preview_link, 'url') else str(preview_link)

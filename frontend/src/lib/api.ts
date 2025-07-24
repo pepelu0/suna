@@ -68,6 +68,12 @@ export type Message = {
   role: string;
   content: string;
   type: string;
+  agent_id?: string;
+  agents?: {
+    name: string;
+    avatar?: string;
+    avatar_color?: string;
+  };
 };
 
 export type AgentRun = {
@@ -104,6 +110,65 @@ export interface FileInfo {
   mod_time: string;
   permissions?: string;
 }
+
+export type WorkflowExecution = {
+  id: string;
+  workflow_id: string;
+  workflow_name: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  started_at: string | null;
+  completed_at: string | null;
+  result: any;
+  error: string | null;
+};
+
+export type WorkflowExecutionLog = {
+  id: string;
+  execution_id: string;
+  node_id: string;
+  node_name: string;
+  node_type: string;
+  started_at: string;
+  completed_at: string | null;
+  status: 'running' | 'completed' | 'failed';
+  input_data: any;
+  output_data: any;
+  error: string | null;
+};
+
+// Workflow Types
+export type Workflow = {
+  id: string;
+  name: string;
+  description: string;
+  status: 'draft' | 'active' | 'paused' | 'disabled' | 'archived';
+  project_id: string;
+  account_id: string;
+  definition: {
+    name: string;
+    description: string;
+    nodes: any[];
+    edges: any[];
+    variables?: Record<string, any>;
+  };
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkflowNode = {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: any;
+};
+
+export type WorkflowEdge = {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+};
 
 // Project APIs
 export const getProjects = async (): Promise<Project[]> => {
@@ -434,6 +499,7 @@ export const getThreads = async (projectId?: string): Promise<Thread[]> => {
       project_id: thread.project_id,
       created_at: thread.created_at,
       updated_at: thread.updated_at,
+      metadata: thread.metadata,
     }));
   return mappedThreads;
 };
@@ -519,7 +585,14 @@ export const getMessages = async (threadId: string): Promise<Message[]> => {
   while (hasMore) {
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select(`
+        *,
+        agents:agent_id (
+          name,
+          avatar,
+          avatar_color
+        )
+      `)
       .eq('thread_id', threadId)
       .neq('type', 'cost')
       .neq('type', 'summary')
@@ -1531,6 +1604,7 @@ export interface SubscriptionStatus {
   cancel_at_period_end: boolean;
   trial_end?: string; // ISO Date string
   minutes_limit?: number;
+  cost_limit?: number;
   current_usage?: number;
   // Fields for scheduled changes
   has_schedule: boolean;
@@ -1555,12 +1629,38 @@ export interface Model {
   display_name: string;
   short_name?: string;
   requires_subscription?: boolean;
+  is_available?: boolean;
+  input_cost_per_million_tokens?: number | null;
+  output_cost_per_million_tokens?: number | null;
+  max_tokens?: number | null;
 }
 
 export interface AvailableModelsResponse {
   models: Model[];
   subscription_tier: string;
   total_models: number;
+}
+
+export interface UsageLogEntry {
+  message_id: string;
+  thread_id: string;
+  created_at: string;
+  content: {
+    usage: {
+      prompt_tokens: number;
+      completion_tokens: number;
+    };
+    model: string;
+  };
+  total_tokens: number;
+  estimated_cost: number;
+  project_id: string;
+}
+
+export interface UsageLogsResponse {
+  logs: UsageLogEntry[];
+  has_more: boolean;
+  message?: string;
 }
 
 export interface CreateCheckoutSessionResponse {

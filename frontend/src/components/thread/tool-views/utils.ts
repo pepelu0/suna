@@ -1,5 +1,5 @@
 // Import at the top
-import { formatDistanceToNow } from 'date-fns';
+// import { formatDistanceToNow } from 'date-fns';
 import {
   FileText,
   FileCode,
@@ -94,7 +94,7 @@ export function extractCommand(content: string | object | undefined | null): str
   try {
     const parsed = JSON.parse(contentStr);
     if (parsed.tool_calls && Array.isArray(parsed.tool_calls)) {
-      const execCommand = parsed.tool_calls.find(tc => 
+      const execCommand = parsed.tool_calls.find((tc: any) => 
         tc.function?.name === 'execute-command' || 
         tc.function?.name === 'execute_command'
       );
@@ -146,7 +146,7 @@ export function extractSessionName(content: string | object | undefined | null):
   try {
     const parsed = JSON.parse(contentStr);
     if (parsed.tool_calls && Array.isArray(parsed.tool_calls)) {
-      const checkCommand = parsed.tool_calls.find(tc => 
+      const checkCommand = parsed.tool_calls.find((tc: any) => 
         tc.function?.name === 'check-command-output' || 
         tc.function?.name === 'check_command_output'
       );
@@ -507,18 +507,30 @@ export function extractFileContent(
   return null;
 }
 
-// Helper to process and clean file content
-function processFileContent(content: string): string {
-  if (!content) return content;
+function processFileContent(content: string | object): string {
+  if (!content) return '';
+  if (typeof content === 'object') {
+    return JSON.stringify(content, null, 2);
+  }
 
-  // Handle escaped characters
+  const trimmedContent = content.trim();
+  const isLikelyJson = (trimmedContent.startsWith('{') && trimmedContent.endsWith('}')) ||
+                       (trimmedContent.startsWith('[') && trimmedContent.endsWith(']'));
+  
+  if (isLikelyJson) {
+    try {
+      const parsed = JSON.parse(content);
+      return JSON.stringify(parsed, null, 2);
+    } catch (e) {
+    }
+  }
   return content
-    .replace(/\\n/g, '\n') // Replace \n with actual newlines
-    .replace(/\\t/g, '\t') // Replace \t with actual tabs
-    .replace(/\\r/g, '') // Remove \r
-    .replace(/\\\\/g, '\\') // Replace \\ with \
-    .replace(/\\"/g, '"') // Replace \" with "
-    .replace(/\\'/g, "'"); // Replace \' with '
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\r/g, '')
+    .replace(/\\\\/g, '\\')
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'");
 }
 
 // Helper to determine file type (for syntax highlighting)
@@ -680,7 +692,7 @@ export function extractUrlsAndTitles(
       }));
     }
     if (parsed.results && Array.isArray(parsed.results)) {
-      return parsed.results.map(result => ({
+      return parsed.results.map((result: any) => ({
         title: result.title || '',
         url: result.url || '',
         snippet: result.content || '',
@@ -1142,7 +1154,7 @@ export function extractSearchResults(
     
     // Check if this is the new Tavily response format
     if (parsedContent.results && Array.isArray(parsedContent.results)) {
-      return parsedContent.results.map(result => ({
+      return parsedContent.results.map((result: any) => ({
         title: result.title || '',
         url: result.url || '',
         snippet: result.content || '',

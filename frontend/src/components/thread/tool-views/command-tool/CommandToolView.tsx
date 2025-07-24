@@ -78,7 +78,7 @@ export function CommandToolView({
       .replace(/\\"/g, '"')
       .replace(/\\'/g, "'");
 
-    processedOutput = processedOutput.replace(/\\u([0-9a-fA-F]{4})/g, (match, group) => {
+    processedOutput = processedOutput.replace(/\\u([0-9a-fA-F]{4})/g, (_match, group) => {
       return String.fromCharCode(parseInt(group, 16));
     });
     return processedOutput.split('\n');
@@ -89,7 +89,7 @@ export function CommandToolView({
   const linesToShow = showFullOutput ? formattedOutput : previewLines;
 
   return (
-    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-white dark:bg-zinc-950">
+    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-card">
       <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">

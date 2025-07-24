@@ -1,3 +1,6 @@
+import dotenv
+dotenv.load_dotenv(".env")
+
 import sentry
 import asyncio
 import json
@@ -6,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from services import redis
 from agent.run import run_agent
-from utils.logger import logger
+from utils.logger import logger, structlog
 import dramatiq
 import uuid
 from agentpress.thread_manager import ThreadManager
@@ -17,10 +20,14 @@ import os
 from services.langfuse import langfuse
 from utils.retry import retry
 
+import sentry_sdk
+from typing import Dict, Any
+
 rabbitmq_host = os.getenv('RABBITMQ_HOST', 'rabbitmq')
 rabbitmq_port = int(os.getenv('RABBITMQ_PORT', 5672))
 rabbitmq_broker = RabbitmqBroker(host=rabbitmq_host, port=rabbitmq_port, middleware=[dramatiq.middleware.AsyncIO()])
 dramatiq.set_broker(rabbitmq_broker)
+
 
 _initialized = False
 db = DBConnection()
@@ -30,9 +37,7 @@ async def initialize():
     """Initialize the agent API with resources from the main API."""
     global db, instance_id, _initialized
 
-    # Use provided instance_id or generate a new one
     if not instance_id:
-        # Generate instance ID
         instance_id = str(uuid.uuid4())[:8]
     await retry(lambda: redis.initialize_async())
     await db.initialize()
@@ -40,6 +45,11 @@ async def initialize():
     _initialized = True
     logger.info(f"Initialized agent API with instance ID: {instance_id}")
 
+@dramatiq.actor
+async def check_health(key: str):
+    """Run the agent in the background using Redis for state."""
+    structlog.contextvars.clear_contextvars()
+    await redis.set(key, "healthy", ex=redis.REDIS_KEY_TTL)
 
 @dramatiq.actor
 async def run_agent_background(
@@ -54,9 +64,17 @@ async def run_agent_background(
     enable_context_manager: bool,
     agent_config: Optional[dict] = None,
     is_agent_builder: Optional[bool] = False,
-    target_agent_id: Optional[str] = None
+    target_agent_id: Optional[str] = None,
+    request_id: Optional[str] = None,
 ):
     """Run the agent in the background using Redis for state."""
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(
+        agent_run_id=agent_run_id,
+        thread_id=thread_id,
+        request_id=request_id,
+    )
+
     try:
         await initialize()
     except Exception as e:
@@ -85,6 +103,16 @@ async def run_agent_background(
     sentry.sentry.set_tag("thread_id", thread_id)
 
     logger.info(f"Starting background agent run: {agent_run_id} for thread: {thread_id} (Instance: {instance_id})")
+    logger.info({
+        "model_name": model_name,
+        "enable_thinking": enable_thinking,
+        "reasoning_effort": reasoning_effort,
+        "stream": stream,
+        "enable_context_manager": enable_context_manager,
+        "agent_config": agent_config,
+        "is_agent_builder": is_agent_builder,
+        "target_agent_id": target_agent_id,
+    })
     logger.info(f"🚀 Using model: {model_name} (thinking: {enable_thinking}, reasoning_effort: {reasoning_effort})")
     if agent_config:
         logger.info(f"Using custom agent: {agent_config.get('name', 'Unknown')}")

@@ -1,23 +1,16 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
-  Settings,
   CheckCircle,
   AlertTriangle,
-  Loader2,
   Clock,
-  Code,
-  FileText,
-  ArrowRight,
   Wrench,
 } from 'lucide-react';
 import { ToolViewProps } from './types';
 import { formatTimestamp, getToolTitle, extractToolData } from './utils';
-import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingState } from './shared/LoadingState';
 
@@ -30,8 +23,6 @@ export function GenericToolView({
   isSuccess = true,
   isStreaming = false,
 }: ToolViewProps) {
-  const [progress, setProgress] = useState(0);
-
   const toolTitle = getToolTitle(name);
 
   const formatContent = (content: any) => {
@@ -129,7 +120,7 @@ export function GenericToolView({
   );
 
   return (
-    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-white dark:bg-zinc-950">
+    <Card className="gap-0 flex border shadow-none border-t border-b-0 border-x-0 p-0 rounded-none flex-col h-full overflow-hidden bg-card">
       <CardHeader className="h-14 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm border-b p-2 px-4 space-y-2">
         <div className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
